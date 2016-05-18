@@ -1,1 +1,31 @@
-#gitignore
+### Scala template
+*.class
+*.log
+
+# sbt specific
+.cache
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+
+# Scala-IDE specific
+.scala_dependencies
+.worksheet
+
+
+### SBT template
+# Simple Build Tool
+# http://www.scala-sbt.org/release/docs/Getting-Started/Directories.html#configuring-version-control
+.idea/
+.ensime_cache/
+.ensime/
+
+## File-based project format:
+*.iws
+
+# IntelliJ
+/out/
