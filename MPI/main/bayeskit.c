@@ -327,7 +327,6 @@ void runPmmhPath(int its, double *lvParam, double *obslik, lvstate ppstate[16], 
 void rowsample(unsigned int *rows, double *w)
 {
 	//printf("Starting rowsample...\n");
-  	//ran_gen();
   	gsl_ran_discrete_t * grdp;
   	double row;
 
@@ -346,20 +345,16 @@ void rowsample(unsigned int *rows, double *w)
 void peturb(double *lvParam)
 {
 	//printf("Starting peturb...\n");
-	//ran_gen();
 	const double SIGMA = 0.01;
-	//printf("lvParam_before %f, %f, %f\n", lvParam[0], lvParam[1], lvParam[2]);
   	lvParam[0] = lvParam[0] * exp(gsl_ran_gaussian(r, SIGMA));
   	lvParam[1] = lvParam[1] * exp(gsl_ran_gaussian(r, SIGMA));
   	lvParam[2] = lvParam[2] * exp(gsl_ran_gaussian(r, SIGMA));
-  	//printf("lvParam_after  %f, %f, %f\n", lvParam[0], lvParam[1], lvParam[2]);
 }
 
 //to get the prior simulate value of prey and predator
 void simPrior(lvstate *simData)
 {
 	//printf("Starting simPrior...\n");
-	//ran_gen();
 	int i; 
 
 	const double PREY_MEAN = 50.0;
@@ -368,7 +363,6 @@ void simPrior(lvstate *simData)
 	for(i=0;i<SAMPLENUM;i++){
 		simData[i].prey = gsl_ran_poisson(r, PREY_MEAN);
 		simData[i].predator = gsl_ran_poisson(r, PRED_MEAN);
-		//printf("simPrior %i\n", simData[i].prey);
 	}
 	//printf("End simPrior...\n");
 
