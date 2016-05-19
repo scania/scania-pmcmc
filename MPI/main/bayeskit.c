@@ -27,7 +27,7 @@ void ran_gen();
 
 double obsLik(lvstate *mystate, double obs)
 {
-	ran_gen();
+	//ran_gen();
 	const double SIGMA=10.0;
 	return log(gsl_ran_gaussian_pdf((obs- mystate->prey), SIGMA));
 }
@@ -165,6 +165,14 @@ void pfPropPar(lvstate ppstate[16], obsdata *myobsdata, double *lvParam, double 
 				((myStateVec+k)->vpptuple+j)->prey = ((tempStateVec+k)->vpptuple+rows[j])->prey;
 				//(myStateVec+k)->(vpptuple+j)->prey = (tempStateVec+k)->(vpptuple+rows[j])->prey;
 			}
+			for (j=0;j<SAMPLENUM;j++) {
+				((tempStateVec+k)->vpptuple+j)->predator = ((myStateVec+k)->vpptuple+j)->predator;
+				((tempStateVec+k)->vpptuple+j)->prey = ((myStateVec+k)->vpptuple+j)->prey;
+			}
+			for (j=0;j<SAMPLENUM;j++) {
+				simData[j].predator = ((myStateVec+i)->vpptuple+j)->predator;
+				simData[j].prey = ((myStateVec+i)->vpptuple+j)->prey;
+			}
 		}
 		likehood = likehood + maxLw + log(wSum/SAMPLENUM);
 		*ll = likehood;
@@ -207,8 +215,9 @@ freeMem:
 void stepLV(lvstate *state, double *t0p, double *dtp, double *lvParam)
 {
 	//printf("Starting stepLV...\n");
-	ran_gen();
-	double t0=*t0p, dt=*dtp, t;
+	//ran_gen();
+	double t0=*t0p, dt=*dtp;
+	double t;
 	double h0,h1,h2,h3,u;
 
 	while (dt>0) {
@@ -247,7 +256,6 @@ void stepLV(lvstate *state, double *t0p, double *dtp, double *lvParam)
 			}
 		}
 	}
-
 	return;
 }
 
@@ -255,7 +263,7 @@ void stepLV(lvstate *state, double *t0p, double *dtp, double *lvParam)
 void runPmmhPath(int its, double *lvParam, double *obslik, lvstate ppstate[16], obsdata *myobsdata)
 {
 	printf("Starting runPmmhPath...\n");
-	ran_gen();
+	//ran_gen();
 	int i, j;
 	double propParam[3];
 	double curParam[3];
@@ -294,9 +302,9 @@ void runPmmhPath(int its, double *lvParam, double *obslik, lvstate ppstate[16], 
 		memcpy(propParam, curParam, sizeof(double) * 3);
 		peturb(propParam);
 
-		pfPropPar(propPath, myobsdata, lvParam, &ll);
+		pfPropPar(propPath, myobsdata, propParam, &ll);
 		propMll = ll;
-		if (log(gsl_ran_flat(r, 0.0, 0.1)) < (propMll - curMll)){
+		if (log(gsl_ran_flat(r, 0.0, 1.0)) < (propMll - curMll)){
 			curMll = propMll;
 			memcpy(curParam, propParam, sizeof(double) * 3);
 			memcpy(curPath, propPath, sizeof(lvstate) * obsnum);
@@ -351,7 +359,7 @@ void peturb(double *lvParam)
 void simPrior(lvstate *simData)
 {
 	//printf("Starting simPrior...\n");
-	ran_gen();
+	//ran_gen();
 	int i; 
 
 	const double PREY_MEAN = 50.0;
@@ -434,10 +442,10 @@ int main(int argc,char *argv[])
   	ran_gen();
 
 	int its;
-	printf("Starting main...\n");
+	printf("Starting MPI main...\n");
 
 	if (argc == 1) {
-		its = 40;
+		its = 20;
 	}
 	else {
 		its = atoi(argv[1]);
