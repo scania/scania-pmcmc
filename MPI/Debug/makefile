@@ -23,19 +23,19 @@ endif
 # Add inputs and outputs from these tool invocations to the build variables 
 
 # All Target
-all: bayeskit
+all: MPI
 
 # Tool invocations
-bayeskit: $(OBJS) $(USER_OBJS)
+MPI: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C Linker'
-	gcc  -o "bayeskit" $(OBJS) $(USER_OBJS) $(LIBS)
+	gcc  -o "MPI" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(EXECUTABLES)$(OBJS)$(C_DEPS) bayeskit
+	-$(RM) $(EXECUTABLES)$(OBJS)$(C_DEPS) MPI
 	-@echo ' '
 
 .PHONY: all clean dependents
