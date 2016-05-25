@@ -4,7 +4,7 @@
 #include <errno.h>
 #include <string.h>
 
-const int SAMPLENUM = 100;
+const int SAMPLENUM = 300;
 int obsnum;
 gsl_rng * r;
 
@@ -409,7 +409,7 @@ int main(int argc, char *argv[]) {
 	printf("Starting main...\n");
 
 	if (argc == 1) {
-		its = 20;
+		its = 10;
 	} else {
 		its = atoi(argv[1]);
 	}
