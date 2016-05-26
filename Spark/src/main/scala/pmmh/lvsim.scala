@@ -35,12 +35,15 @@ object lvsim {
     def simPrior2(n: Int, t: Double, th: LvParameter2): Vector[Array[Int]] = {
         val prey = new Poisson(800.0).sample(n).toArray
         var predator = ListBuffer(prey)
-        for(i <- 1 to (th.size-1)/2)
-            predator += new Uniform(0.0, 1000.0).sample(n).toArray map {_.toInt}
+        //for(i <- 1 to (th.size-1)/2)
+        predator += new Poisson(500.0).sample(n).toArray
+        predator += new Poisson(600.0).sample(n).toArray
+        //predator += new Poisson(400.0).sample(n).toArray
         predator.toArray.transpose.toVector
     }
 
     def obsLik(s: (Int, Int), o: Double): Double = {
+        //println("s._1-o: " + (s._1-o))
         Gaussian(s._1, 10.0).logPdf(o)
     }
 
@@ -48,8 +51,14 @@ object lvsim {
         Gaussian(s._1, 10.0).logPdf(o(0)) + Gaussian(s._2, 10.0).logPdf(o(1))
     }
 
-    def obsLik2(s: Array[Int], o: Double): Double = {
-        Gaussian(s(0), 10.0).logPdf(o)
+    def obsLik2(s: Array[Int], o: List[Double]): Double = {
+        var result = 0.0
+        for(i <- 0 to (o.size-1)){
+            //println("o(i)/4: " + o(i)/4)
+            result += Gaussian(s(i), 10).logPdf(o(i))
+        }
+        //println(result)
+        result
     }
 
 
@@ -57,28 +66,30 @@ object lvsim {
 
     //th = List(1.0, 0.005, 0.0025, 0.006, 0.6, 0.3, 0.72)
     def runModel(its: Int) = {
-        val rawData = Source.fromFile("/home/hshzcs/Desktop/scania-pmcmc/Spark/LV13data2.txt").getLines.toList.take(31).map(_.split("\t").map(_.trim.toDouble))
-        val data = rawData map { x => (x(0), x(1)) }//(rawData.indices.filter(_ % 2 == 0).map(rawData(_))).toList map { x => (x(0), x(1)) }
+        val rawData = Source.fromFile("./LV12data-even2.txt").getLines.toList.take(11).map(_.split("\t").map(_.trim.toDouble))
+        val data = rawData map { x => (x(0),List(x(1))) }//(rawData.indices.filter(_ % 2 == 0).map(rawData(_))).toList map { x => (x(0), x(1)) }
         //val rawData = Source.fromFile("/home/hshzcs/thesiscode/SparkApp/LVpreyNoise10.txt").getLines//.map(_.split(",").map(_.trim.toDouble))
-        //val data2 = ((0 to 30 by 2).toList zip rawData.toList) map { x => (x._1.toDouble, x._2) }
+        //val data = ((0 to 30 by 2).toList zip rawData.toList) map { x => (x._1.toDouble, x._2.toDouble) }
         //parallel-spark
-        //val context = helpers.Configuration.connectToSparkCluster("LV-v1")
-        //val mll = pfPropPar_spark(100000, simPrior, 0.0, stepLV, obsLik, data, context)
+        //val context = helper.Configuration.connectToSparkCluster("LV-v1")
+        //val mll = pfPropPar_spark(5000, simPrior, 0.0, stepLV, obsLik, data, context)
         //parallel-spark2
-        val context = helper.Configuration.connectToSparkCluster("LV13")
-        val mll = pfPropPar_spark2(1000, simPrior2, 0.0, stepLV2, obsLik2, data, context)
+        //val context = helper.Configuration.connectToSparkCluster("LV12")
+        //val mll = pfPropPar_spark2(1000, simPrior2, 0.0, stepLV2, obsLik2, data, context)
         //parallel-scala
         //val mll = pfPropPar_scala(1000, simPrior, 0.0, stepLV, obsLik, data)
         //parallel-scala2
-        //val mll = pfPropPar_scala2(1000, simPrior2, 0.0, stepLV2, obsLik2, data)
+        val mll = pfPropPar_scala2(1000, simPrior2, 0.0, stepLV2, obsLik2, data)
         //sequential
         //val mll = pfProp(100, simPrior, 0.0, stepLV, obsLik, data)
-        val s = new PrintWriter(new File("/home/hshzcs/Desktop/scania-pmcmc/Spark/mcmc-out.csv"))
+        val s = new PrintWriter(new File("./mcmc-out-lv12-even.csv"))
         // val s=new OutputStreamWriter(System.out)
-        s.write("th1,th2,th3,th4,th5,th6,th7,")
-        s.write(((0 to 30) map { n => "prey" + n + ",pred1_" + n + ",pred2_" + n +",pred3_" + n}).mkString(",") + "\n")
+        s.write("th1,th2,th3,th4,th5,")
+        s.write(((0 to 30 by 2) map { n => "prey" + n + ",pred1_" + n + ",pred2_" + n}).mkString(",") + "\n")
+        //s.write(((0 to 30 by 2) map { n => "prey" + n + ",pred" + n }).mkString(",") + "\n")
         //val pmmhOutput = runPmmhPath(s, its, new LvParameter(1.0, 0.005, 0.6), mll, peturb)
-        val pmmhOutput = runPmmhPath2(s, its, List(10.0, 0.005, 0.0025, 0.006, 6.0, 3.0, 7.2), mll, peturb2)
+        val pmmhOutput = runPmmhPath2(s, its, List(10.0, 0.005, 0.0025, 6.0, 3.0), mll, peturb2)
+        //val pmmhOutput = runPmmhPath2(s, its, List(1.0, 0.005, 0.0025, 0.6, 0.3), mll, peturb2)
         s.close
         //context.stop()
     }
@@ -136,6 +147,7 @@ object lvsim {
 
             val h0 = adSum(h)
             val t = if (h0 < 1e-10 || x(0) > 1e6) 1e99 else new Exponential(h0).draw
+            //println("t: " + t)
             if (t > dt) x
             else{
                 val u = new Uniform(0, 1).draw
@@ -206,5 +218,10 @@ object lvsim {
 
     def peturb2(th: List[Double]): List[Double] = {
         th map {x => x * exp(Gaussian(0, 0.01).draw)}
+    }
+
+    //only peturb the first parameter
+    def peturb3(th: List[Double]): List[Double] = {
+        List(th(0) * exp(Gaussian(0, 0.01).draw), th(1), th(2), th(3), th(4))
     }
 }

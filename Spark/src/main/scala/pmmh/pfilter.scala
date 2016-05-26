@@ -72,26 +72,30 @@ object pfilter {
 
     def pfPropPar_scala(
                          n: Int,
-                         simx0: (Int, Double, LvParameter2) => Vector[(Int, Int)],
+                         simx0: (Int, Double, LvParameter) => Vector[(Int, Int)],
                          t0: Double,
-                         stepFun: ((Int, Int), Double, Double, LvParameter2) => (Int, Int),
+                         stepFun: ((Int, Int), Double, Double, LvParameter) => (Int, Int),
                          dataLik: ((Int, Int), Double) => Double,
-                         data: TS[Double]): (LvParameter2 => (Double, List[(Int, Int)])) = {
+                         data: TS[Double]): (LvParameter => (Double, List[(Int, Int)])) = {
         val (times, obs) = data.unzip
         //List(0.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0)
         //time difference between two prey-predator guesses
         val deltas = diff(t0 :: times)
-        (th: LvParameter2) => {
-            val x0 = simx0(n, t0, th).par
-            @tailrec def pf(ll: Double, x: ParVector[List[(Int, Int)]], t: Double, deltas: Iterable[Double], obs: List[Double]): (Double, List[(Int, Int)]) =
+        (th: LvParameter) => {
+            val x0 = simx0(n, t0, th)//.par
+            @tailrec def pf(ll: Double, x: Vector[List[(Int, Int)]], t: Double, deltas: Iterable[Double], obs: List[Double]): (Double, List[(Int, Int)]) =
                 obs match {
-                    case Nil => (ll, x(0).reverse)
+                    case Nil => {
+                        println("ll: "+ll)
+                        (ll, x(0).reverse)
+                    }
                     case head :: tail => {
+                        println("ll: "+ll)
                         val xp = if (deltas.head == 0) x else (x map { l => stepFun(l.head, t, deltas.head, th) :: l })
                         val lw = xp map { l => dataLik(l.head, head) }
                         val max = lw.max
                         val w = lw map { x => exp(x - max) }
-                        val rows = sample(n, DenseVector(w.toArray)).par
+                        val rows = sample(n, DenseVector(w.toArray))//.par
                         val xpp = rows map { xp(_) } // the _th element of xp
                         pf(ll + max + log(mean(w)), xpp, t + deltas.head, deltas.tail, tail)
                     }
@@ -105,35 +109,33 @@ object pfilter {
                                simx0: (Int, Double, LvParameter2) => Vector[Array[Int]],
                                t0: Double,
                                stepFun: (Array[Int], Double, Double, LvParameter2) => Array[Int],
-                               dataLik: (Array[Int], Double) => Double,
-                               data: TS[Double]): (LvParameter2 => (Double, List[Array[Int]])) = {
+                               dataLik: (Array[Int], List[Double]) => Double,
+                               data: TS[List[Double]]): (LvParameter2 => (Double, List[Array[Int]])) = {
         val (times, obs) = data.unzip
         //List(0.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0)
         //time difference between two prey-predator guesses
         val deltas = diff(t0 :: times)
         (th: LvParameter2) => {
             val x0 = simx0(n, t0, th).par
-            @tailrec def pf(ll: Double, x: ParVector[List[Array[Int]]], t: Double, deltas: Iterable[Double], obs: List[Double]): (Double, List[Array[Int]]) =
+            @tailrec def pf(ll: Double, x: ParVector[List[Array[Int]]], t: Double, deltas: Iterable[Double], obs: List[List[Double]]): (Double, List[Array[Int]]) =
                 //obs match {
                     //case Nil => (ll, x(0).reverse)
                     //case head :: tail => {
                 if(obs.size > 0) {
+                    println("ll: "+ ll)
                     val head = obs.head
                     val xp = if (deltas.head == 0) x else (x map { l => stepFun(l.head, t, deltas.head, th) :: l })
                     val lw = xp map { l => dataLik(l.head, head) }
                     val max = lw.max
                     val w = lw map { x => exp(x - max) }
                     val rows = sample(n, DenseVector(w.toArray)).par
-                    val xpp = rows map {
-                        xp(_)
-                    } // the _th element of xp
+                    val xpp = rows map { xp(_) } // the _th element of xp
                     pf(ll + max + log(mean(w)), xpp, t + deltas.head, deltas.tail, obs.tail)
                 }
                 else{
+                    println("ll: "+ ll)
                     (ll, x.head.reverse)
                 }
-                    //}
-                //}
             pf(0, x0 map { _ :: Nil }, t0, deltas, obs)
         }
     }
@@ -143,8 +145,8 @@ object pfilter {
                                 simx0: (Int, Double, LvParameter2) => Vector[Array[Int]],
                                 t0: Double,
                                 stepFun: (Array[Int], Double, Double, LvParameter2) => Array[Int],
-                                dataLik: (Array[Int], Double) => Double,
-                                data: TS[Double],
+                                dataLik: (Array[Int], List[Double]) => Double,
+                                data: TS[List[Double]],
                                 context: SparkContext): (LvParameter2 => (Double, List[Array[Int]])) = {
         val (times, obs) = data.unzip
         //List(0.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0)
@@ -152,8 +154,9 @@ object pfilter {
         val deltas = diff(t0 :: times)
         (th: LvParameter2) => {
             val x0 = simx0(n, t0, th)
-            @tailrec def pf(ll: Double, x: Vector[List[Array[Int]]], t: Double, deltas: Iterable[Double], obs: List[Double]): (Double, List[Array[Int]]) =
+            @tailrec def pf(ll: Double, x: Vector[List[Array[Int]]], t: Double, deltas: Iterable[Double], obs: List[List[Double]]): (Double, List[Array[Int]]) =
             if(obs.size > 0){
+                println("ll: "+ ll)
                 val head = obs.head
                 val xp = if (deltas.head == 0) getCol2(x, 0) else (context.parallelize(getCol2(x, 0), 40) map { l => stepFun(l, t, deltas.head, th) }).collect().toVector
                 val lw = xp map { l => dataLik(l, head) }
@@ -164,6 +167,7 @@ object pfilter {
                 pf(ll + max + log(mean(w)), xpp, t + deltas.head, deltas.tail, obs.tail)
             }
             else{
+                println("ll: "+ ll)
                 (ll, x.head.reverse)
             }
             pf(0, x0 map { _ :: Nil }, t0, deltas, obs)
@@ -184,25 +188,20 @@ object pfilter {
         (th: LvParameter) => {
             val x0 = simx0(n, t0, th) //.par
             @tailrec def pf(ll: Double, x: Vector[List[(Int, Int)]], t: Double, deltas: Iterable[Double], obs: List[Double]): (Double, List[(Int, Int)]) =
-                obs match {
-                    case Nil => (ll, x.head.reverse)
-                    case head :: tail => {
+                if(obs.size > 0){
                         //val subx = context.parallelize(x.grouped(200).toVector, 16)//val subx = x.grouped(10).toVector
                         //println("headdd: " + headdd)
+                        val head = obs.head
                         val xp = if (deltas.head == 0) getCol(x, 0) else (context.parallelize(getCol(x, 0), 16) map { l => stepFun(l, t, deltas.head, th) }).collect().toVector
                         val lw = xp map { l => dataLik(l, head) }
                         val max = lw.max
                         val w = lw map { x => exp(x - max) }
                         val rows = sample(n, DenseVector(w.toArray))
-                        if(rows == 1000)
-                            println(rows)
-                        if(rows == 1500) {
-                            println(rows)
-                            System.exit(0)
-                        }
                         val xpp = rows map {r => xp(r) :: x(r)}
-                        pf(ll + max + log(mean(w)), xpp, t + deltas.head, deltas.tail, tail)
+                        pf(ll + max + log(mean(w)), xpp, t + deltas.head, deltas.tail, obs.tail)
                     }
+                else{
+                    (ll, x.head.reverse)
                 }
             pf(0, x0 map { _ :: Nil}, t0, deltas, obs)
         }

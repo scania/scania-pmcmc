@@ -1,7 +1,5 @@
 package pmmh
 
-import scala.collection.mutable.ListBuffer
-
 /**
   * Created by hshzcs on 5/18/16.
   */
@@ -10,7 +8,7 @@ object bayeskit {
     def main(args: Array[String]): Unit = {
         val start = System.currentTimeMillis()
         println("Starting...")
-        val its = if (args.length == 0) 100 else args(0).toInt
+        val its = if (args.length == 0) 50 else args(0).toInt
         println("Running for " + its + " iters:")
         lvsim.runModel(its)
         println("\nDone.")
@@ -44,21 +42,46 @@ object bayeskit {
 
     //generated lv13data
     def getValidList() = {
-        var x0 = Array(800, 500, 600, 400)
+        var x0 = Array(2205,1009,817)
 
-        val th = List(10.0, 0.005, 0.0025, 0.006, 6.0, 3.0, 7.2)
+        var tmp = Array(0, 0, 0)
 
-        var result = ListBuffer(x0)
+        val th = List(10.0, 0.005, 0.0025, 6.0, 3.0)
+
+        //var result = ListBuffer(x0)
 
         var j=0
 
-        println("x0: "+x0.mkString(","))
+        //println("x0: "+x0.mkString(","))
 
-        while (j < 100){
-            print("x" + (j+1) + ": ")
-            x0 = lvsim.stepLV2(x0, j, 1, th)
+        while (j < 1000){
+            //print("x" + (j+1) + ": ")
+            tmp = lvsim.stepLV2(x0, 0, 2, th)
             //x0 = lvsim.stepLV3(x0, j, 1, new LvParameter(1.0, 0.005, 0.6))
-            println(x0.mkString(","))
+            println(tmp.mkString(","))
+            //println((j+1)+","+x0._1+","+x0._2)
+            j = j+1
+        }
+    }
+
+    def getValidList_lv11() = {
+        var x0 = Array(157, 87)
+
+        var tmp = Array(0, 0)
+
+        val th = List(1.0, 0.005, 0.6)
+
+        //var result = ListBuffer(x0)
+
+        var j=0
+
+        //println("x0: "+x0.mkString(","))
+
+        while (j < 1000){
+            //print("x" + (j+1) + ": ")
+            tmp = lvsim.stepLV2(x0, 2, 2, th)
+            //x0 = lvsim.stepLV3(x0, j, 1, new LvParameter(1.0, 0.005, 0.6))
+            println(tmp.mkString(","))
             //println((j+1)+","+x0._1+","+x0._2)
             j = j+1
         }
