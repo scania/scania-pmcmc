@@ -7,7 +7,7 @@
 #include "gsl-sprng.h"
 #include <mpi.h>
 
-const int SAMPLENUM = 500;
+const int SAMPLENUM = 10000;
 int obsnum;
 gsl_rng * r;
 int procnum;
@@ -38,7 +38,7 @@ double obsLik(lvstate *mystate, double obs)
 void mpiStepLV(lvstate *simData, double *t0p, double *dtp, double *lvParam, MPI_Datatype datatype, MPI_Comm comm)
 {
 	//printf("...callStepLV...");
-	int i, j, offset, destNode, sourceNode, rank;
+	int j, offset, destNode, sourceNode, rank;
 	int procnum, avgsize, samplemod;
 	double t0, dt;
 	MPI_Status status;
@@ -60,16 +60,6 @@ void mpiStepLV(lvstate *simData, double *t0p, double *dtp, double *lvParam, MPI_
 
 	t0 = *t0p;
 	dt = *dtp;
-	if (rank==0)
-	{
-		int prey[SAMPLENUM];
-		int pred[SAMPLENUM];
-		for(i=0;i<SAMPLENUM;i++)
-		{
-			prey[i] = simData[i].prey;
-			pred[i] = simData[i].predator;
-		}
-	}
 
 	if (rank==0)
 	{
@@ -83,9 +73,9 @@ void mpiStepLV(lvstate *simData, double *t0p, double *dtp, double *lvParam, MPI_
 		for (destNode=1; destNode<procnum; destNode++){
 			//MPI_Send(&lvParam, 3, MPI_DOUBLE, destNode, 0, MPI_COMM_WORLD);
 			MPI_Send(&offset, 1, MPI_INT, destNode, 0, MPI_COMM_WORLD);
-			for (i=0;i<avgsize;i++)
+			for (j=0;j<avgsize;j++)
 			{
-				MPI_Send(&simData[offset+i].prey, 1, MPI_INT, destNode, 0, MPI_COMM_WORLD);
+				MPI_Send(&simData[offset+j].prey, 1, MPI_INT, destNode, 0, MPI_COMM_WORLD);
 				MPI_Send(&simData[offset+j].predator, 1, MPI_INT, destNode, 0, MPI_COMM_WORLD);
 			}
 			offset = offset + avgsize;
@@ -101,10 +91,10 @@ void mpiStepLV(lvstate *simData, double *t0p, double *dtp, double *lvParam, MPI_
 		for (sourceNode=1; sourceNode<procnum; sourceNode++){
 
 			MPI_Recv(&offset, 1, MPI_INT, sourceNode, 0, MPI_COMM_WORLD, &status);
-			for (i=0;i<avgsize;i++)
+			for (j=0;j<avgsize;j++)
 			{
-				MPI_Recv(&simData[offset+i].prey, 1, MPI_INT, sourceNode, 0, MPI_COMM_WORLD, &status);
-				MPI_Recv(&simData[offset+i].predator, 1, MPI_INT, sourceNode, 0, MPI_COMM_WORLD, &status);
+				MPI_Recv(&simData[offset+j].prey, 1, MPI_INT, sourceNode, 0, MPI_COMM_WORLD, &status);
+				MPI_Recv(&simData[offset+j].predator, 1, MPI_INT, sourceNode, 0, MPI_COMM_WORLD, &status);
 			}
 		}
 	}
@@ -644,7 +634,7 @@ int main(int argc,char *argv[])
 	//printf("rank in main %i \n", rank);
 
 	if (argc == 1) {
-		its = 1000;
+		its = 3;
 	}
 	else {
 		its = atoi(argv[1]);

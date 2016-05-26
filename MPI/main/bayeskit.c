@@ -4,7 +4,7 @@
 #include <errno.h>
 #include <string.h>
 
-const int SAMPLENUM = 300;
+const int SAMPLENUM = 1000;
 int obsnum;
 gsl_rng * r;
 
@@ -217,36 +217,42 @@ void pfPropPar(lvstate ppstate[16], obsdata *myobsdata, double *lvParam,
 void stepLV(lvstate *state, double *t0p, double *dtp, double *lvParam) {
 	//printf("Starting stepLV...\n");
 	double t0 = *t0p, dt = *dtp, t;
-	double h0, h1, h2, h3, u;
+	double h0, h1, h2, h3, u, l0, l1, l2;
+	int prey, predator;
+	prey = state->prey;
+	predator = state->predator;
+	l0 = lvParam[0];
+	l1 = lvParam[1];
+	l2 = lvParam[2];
 
 	while (dt > 0) {
-		h1 = lvParam[0] * state->prey;
-		h2 = lvParam[1] * state->prey * state->predator;
-		h3 = lvParam[2] * state->predator;
+		h1 = l0 * prey;
+		h2 = l1 * prey * predator;
+		h3 = l2 * predator;
 		h0 = h1 + h2 + h3;
 
-		if ((h0 < (1e-10)) || (state->prey >= 1000000))
+		if ((h0 < (1e-10)) || (prey >= 1000000))
 			t = 1e99;
 		else {
 			t = gsl_ran_exponential(r, 1/h0);
 		}
 		if (t > dt) {
-			//PutRNGstate();
-			//printf("out state %i, %i\n", state->prey, state->predator);
+			state->prey = prey;
+			state->predator = predator;
 			return;
 		} else {
 			u = gsl_rng_uniform(r);
 			if (u < (h1 / h0)) {
-				state->prey = state->prey + 1;
+				prey = prey + 1;
 				t0 = t0 + t;
 				dt = dt - t;
 			} else if (u < ((h1 + h2) / h0)) {
-				state->prey = state->prey - 1;
-				state->predator = state->predator + 1;
+				prey = prey - 1;
+				predator = predator + 1;
 				t0 = t0 + t;
 				dt = dt - t;
 			} else {
-				state->predator = state->predator - 1;
+				predator = predator - 1;
 				t0 = t0 + t;
 				dt = dt - t;
 			}
@@ -409,7 +415,7 @@ int main(int argc, char *argv[]) {
 	printf("Starting main...\n");
 
 	if (argc == 1) {
-		its = 10;
+		its = 40;
 	} else {
 		its = atoi(argv[1]);
 	}
