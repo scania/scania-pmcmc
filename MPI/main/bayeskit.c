@@ -1,10 +1,12 @@
+/*
 #include <stdio.h>
 #include <stdlib.h>
 #include <gsl/gsl_randist.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 
-const int SAMPLENUM = 1000;
+const int SAMPLENUM = 500000;
 int obsnum;
 gsl_rng * r;
 
@@ -216,9 +218,9 @@ void pfPropPar(lvstate ppstate[16], obsdata *myobsdata, double *lvParam,
 
 void stepLV(lvstate *state, double *t0p, double *dtp, double *lvParam) {
 	//printf("Starting stepLV...\n");
-	double t0 = *t0p, dt = *dtp, t;
-	double h0, h1, h2, h3, u, l0, l1, l2;
-	int prey, predator;
+	register double t0 = *t0p, dt = *dtp, t;
+	register double h0, h1, h2, h3, u, l0, l1, l2;
+	register int prey, predator;
 	prey = state->prey;
 	predator = state->predator;
 	l0 = lvParam[0];
@@ -325,14 +327,14 @@ void rowsample(int *rows, double *w) {
 	gsl_ran_discrete_t * grdp;
 	int row;
 	int i;
-
+	grdp = gsl_ran_discrete_preproc(SAMPLENUM, w);
 	for (i = 0; i < SAMPLENUM; i++) {
-		grdp = gsl_ran_discrete_preproc(SAMPLENUM, w);
+
 		row = (int) gsl_ran_discrete(r, grdp);
 		rows[i] = row;
-		gsl_ran_discrete_free(grdp);
-	}
 
+	}
+	gsl_ran_discrete_free(grdp);
 	return;
 }
 
@@ -410,19 +412,29 @@ int main(int argc, char *argv[]) {
 	r = gsl_rng_alloc(T);
 	seed = time(NULL) * getpid();    // set seed
 	gsl_rng_set(r, seed);
+	clock_t begin, end;
+	double time_spent;
 
+	begin = clock();
 	int its;
 	printf("Starting main...\n");
 
 	if (argc == 1) {
-		its = 40;
+		its = 1;
 	} else {
 		its = atoi(argv[1]);
 	}
 	runModel(its);
 
 	gsl_rng_free(r);
+
+	end = clock();
+	time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+	printf("Time consuming in total is %f\n", time_spent);
+
 	printf("Running for %i", its);
 	printf(" iterations, Done.");
 	return 0;
 }
+
+*/
