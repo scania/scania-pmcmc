@@ -1,5 +1,9 @@
 package pmmh
 
+import breeze.stats.distributions.Gaussian
+
+import scala.math._
+
 /**
   * Created by hshzcs on 5/18/16.
   */
@@ -8,7 +12,7 @@ object bayeskit {
     def main(args: Array[String]): Unit = {
         val start = System.currentTimeMillis()
         println("Starting...")
-        val its = if (args.length == 0) 50 else args(0).toInt
+        val its = if (args.length == 0) 100 else args(0).toInt
         println("Running for " + its + " iters:")
         lvsim.runModel(its)
         println("\nDone.")
@@ -37,12 +41,12 @@ object bayeskit {
         //}
         //for(i <- 0 to 0)
         //getValidList()
-
+        //println(System.getProperty("java.library.path"))
     }
 
     //generated lv13data
     def getValidList() = {
-        var x0 = Array(2205,1009,817)
+        var x0 = Array(800,500,600)
 
         var tmp = Array(0, 0, 0)
 
@@ -56,7 +60,7 @@ object bayeskit {
 
         while (j < 1000){
             //print("x" + (j+1) + ": ")
-            tmp = lvsim.stepLV2(x0, 0, 2, th)
+            tmp = lvsim.stepLV2(x0, 0, 4, th)
             //x0 = lvsim.stepLV3(x0, j, 1, new LvParameter(1.0, 0.005, 0.6))
             println(tmp.mkString(","))
             //println((j+1)+","+x0._1+","+x0._2)
@@ -65,7 +69,7 @@ object bayeskit {
     }
 
     def getValidList_lv11() = {
-        var x0 = Array(157, 87)
+        var x0 = Array(35, 100)
 
         var tmp = Array(0, 0)
 
@@ -75,13 +79,13 @@ object bayeskit {
 
         var j=0
 
-        //println("x0: "+x0.mkString(","))
+        println(x0.mkString(","))
 
-        while (j < 1000){
+        while (j < 100){
             //print("x" + (j+1) + ": ")
-            tmp = lvsim.stepLV2(x0, 2, 2, th)
+            x0 = lvsim.stepLV2(x0, 0, 1, th)
             //x0 = lvsim.stepLV3(x0, j, 1, new LvParameter(1.0, 0.005, 0.6))
-            println(tmp.mkString(","))
+            println(x0.mkString(","))
             //println((j+1)+","+x0._1+","+x0._2)
             j = j+1
         }

@@ -20,7 +20,8 @@ object Configuration {
 
     val sparkConfPath = "/cluster/sesonas13/hshzcs/spark"
     val sparkHome = "/share/apps/spark/spark-1.6.0"
-    //val sparkMyHome = "/home/hshzcs/Applications/spark-1.5.2/"
+    //val sparkConfPath = "/home/hshzcs/Applications/rdma-spark-0.9.1-bin/"
+    //val sparkHome = "/home/hshzcs/Applications/rdma-spark-0.9.1-bin/"
 
 
     private def getPropertiesList(key: String) = {
@@ -44,6 +45,7 @@ object Configuration {
     lazy val SPARK_MASTER_HOST = Try(config.getString("spark.master_host")).getOrElse("local")
     lazy val SPARK_MASTER_PORT = Try(config.getInt("spark.master_port")).getOrElse(7077)
     lazy val SPARK_HOME = Try(config.getString("spark.home")).getOrElse(sparkConfPath)
+    //lazy val SPARK_WORKER_CORES = Try(config.getString("cores")).getOrElse("32")
     lazy val SPARK_MEMORY = Try(config.getString("spark.memory")).getOrElse("1g")
     lazy val SPARK_DRIVER_MEMORY = Try(config.getString("spark.driver.memory")).getOrElse("1g")
     lazy val SPARK_OPTIONS = getPropertiesList("spark.options")
@@ -61,7 +63,7 @@ object Configuration {
                 filter(x => x.isFile && x.getName.toLowerCase.takeRight(4) == ".jar").
                 toList.map(_.toString)*/
 
-        val master = "spark://10.6.3.238:7077"
+        val master = "spark://10.6.10.238:7077"
 
         // Spark Context configuration
         val scConf =
@@ -70,6 +72,9 @@ object Configuration {
                         .setMaster(master)
                         .setAppName(appName)
                         .set("spark.executor.memory", SPARK_MEMORY)
+                        //.set("spark.memory.storageFraction", "0.5")
+                        //.set("spark.memory.fraction","0.25")
+                        .set("spark.cores.max", "80")
                         .setSparkHome(sparkHome)
                         .setJars(thisPackagedJar)
                         .set("spark.default.parallelism", SPARK_DEFAULT_PAR)

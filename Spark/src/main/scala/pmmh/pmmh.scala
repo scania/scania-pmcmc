@@ -17,7 +17,7 @@ object pmmh {
         @tailrec def pmmhAcc(itsLeft: Int, currentState: LvParameter, currentMll: Double, currentPath: List[(Int, Int)], allIts: List[LvParameter]): List[LvParameter] = {
             System.err.print(itsLeft.toString + " ")
             s.write(currentState.toString + ",")
-            s.write((currentPath map { x => x._1 + "," + x._2 }).mkString(",") + "\n")
+            s.write((currentPath.tail map { x => x._1 + "," + x._2 }).mkString(",") + "\n")
             if (itsLeft == 0) allIts
             else {
                 val prop = peturb(currentState)
@@ -39,10 +39,11 @@ object pmmh {
         pmmhAcc(iters, initialState, (-1e99).toDouble, mll(initialState)._2, Nil).reverse
     }
 
-    //lv13
+    //lv12
     def runPmmhPath2(s: Writer, iters: Int, initialState: List[Double], mll: List[Double] => (Double, List[Array[Int]]), peturb: List[Double] => List[Double]): List[List[Double]] = {
         @tailrec def pmmhAcc(itsLeft: Int, currentState: List[Double], currentMll: Double, currentPath: List[Array[Int]], allIts: List[List[Double]]): List[List[Double]] = {
             System.err.print(itsLeft.toString + " ")
+            s.write(currentMll+",")
             s.write(currentState.mkString(",") + ",")
             s.write((currentPath map { x => x.mkString(",")}).mkString(",") + "\n")//tail only applies to Spark version
             if (itsLeft == 0) allIts
