@@ -30,7 +30,7 @@ object lv12_spark {
     def main(args: Array[String]): Unit = {
         val start = System.currentTimeMillis()
         println("Starting...")
-        val its = if (args.length == 0) 200 else args(0).toInt
+        val its = if (args.length == 0) 1000 else args(0).toInt
         println("Running for " + its + " iters:")
         runModel(its)
         println("\nDone.")
@@ -51,7 +51,7 @@ object lv12_spark {
         s.write("ll,th1,th2,th3,th4,th5,")
         s.write(((0 to 20 by 4) map { n => "prey" + n + ",pred1_" + n + ",pred2_" + n}).mkString(",") + "\n")
 
-        val pmmhOutput = runPmmhPath2(s, its, List(8.0, 0.005, 0.0025, 6.0, 3.0), mll, peturb2)
+        val pmmhOutput = runPmmhPath2(s, its, List(10.0, 0.005, 0.0025, 6.0, 3.0), mll, peturb2)
 
         s.close
         context.stop()
