@@ -1,4 +1,3 @@
-/*
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,14 +9,15 @@
 #include <time.h>
 #include <unistd.h>
 
-const int SAMPLENUM = 5000;
+const int SAMPLENUM = 1000;
 int obsnum;
 gsl_rng * r;
 int procnum;
 
 typedef struct {
 	int prey;
-	int predator;
+	int predator0;
+	int predator1;
 } lvstate;
 
 typedef struct {
@@ -32,10 +32,8 @@ void peturb(double *lvParam, MPI_Datatype datatype, MPI_Comm comm);
 
 double obsLik(lvstate *mystate, double obs)
 {
-
-		const double SIGMA = 10.0;
+		const double SIGMA = 20.0;
 		return log(gsl_ran_gaussian_pdf((obs - mystate->prey), SIGMA));
-
 }
 
 void mpiStepLV(lvstate *simData, double *t0p, double *dtp, double *lvParam, MPI_Datatype datatype, MPI_Comm comm)
@@ -54,7 +52,7 @@ void mpiStepLV(lvstate *simData, double *t0p, double *dtp, double *lvParam, MPI_
 		//MPI_Bcast(&simData[j].predator, 1, MPI_INT, 0, comm);
 		//MPI_Bcast(&simData[j].prey, 1, MPI_INT, 0, comm);
 	//}
-	MPI_Bcast(lvParam, 3, MPI_DOUBLE, 0, comm);
+	MPI_Bcast(lvParam, 5, MPI_DOUBLE, 0, comm);
 	MPI_Bcast(t0p, 1, MPI_DOUBLE, 0, comm);
 	MPI_Bcast(dtp, 1, MPI_DOUBLE, 0, comm);
 
@@ -76,7 +74,8 @@ void mpiStepLV(lvstate *simData, double *t0p, double *dtp, double *lvParam, MPI_
 			for (j=0;j<avgsize;j++)
 			{
 				MPI_Send(&simData[offset+j].prey, 1, MPI_INT, destNode, 0, MPI_COMM_WORLD);
-				MPI_Send(&simData[offset+j].predator, 1, MPI_INT, destNode, 0, MPI_COMM_WORLD);
+				MPI_Send(&simData[offset+j].predator0, 1, MPI_INT, destNode, 0, MPI_COMM_WORLD);
+				MPI_Send(&simData[offset+j].predator1, 1, MPI_INT, destNode, 0, MPI_COMM_WORLD);
 			}
 			offset = offset + avgsize;
 		}
@@ -93,7 +92,8 @@ void mpiStepLV(lvstate *simData, double *t0p, double *dtp, double *lvParam, MPI_
 			for (j=0;j<avgsize;j++)
 			{
 				MPI_Recv(&simData[offset+j].prey, 1, MPI_INT, sourceNode, 0, MPI_COMM_WORLD, &status);
-				MPI_Recv(&simData[offset+j].predator, 1, MPI_INT, sourceNode, 0, MPI_COMM_WORLD, &status);
+				MPI_Recv(&simData[offset+j].predator0, 1, MPI_INT, sourceNode, 0, MPI_COMM_WORLD, &status);
+				MPI_Recv(&simData[offset+j].predator1, 1, MPI_INT, sourceNode, 0, MPI_COMM_WORLD, &status);
 			}
 		}
 	}
@@ -104,7 +104,8 @@ void mpiStepLV(lvstate *simData, double *t0p, double *dtp, double *lvParam, MPI_
 		for (j=0;j<avgsize;j++)
 		{
 			MPI_Recv(&simData[offset+j].prey, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
-			MPI_Recv(&simData[offset+j].predator, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+			MPI_Recv(&simData[offset+j].predator0, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+			MPI_Recv(&simData[offset+j].predator1, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
 		}
 
 		//doing stepLV for every slave processor/node
@@ -117,7 +118,8 @@ void mpiStepLV(lvstate *simData, double *t0p, double *dtp, double *lvParam, MPI_
 		for (j=0;j<avgsize;j++)
 		{
 			MPI_Send(&simData[offset+j].prey, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
-			MPI_Send(&simData[offset+j].predator, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+			MPI_Send(&simData[offset+j].predator0, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+			MPI_Send(&simData[offset+j].predator1, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
 		}
 
 	}
@@ -178,10 +180,6 @@ void pfPropPar(lvstate ppstate[16], obsdata *myobsdata, double *lvParam, double 
 	if (rank==0)
 	{
 		simPrior(simData, MPI_FLOAT, MPI_COMM_WORLD);
-		for (j=0;j<SAMPLENUM;j++)
-		{
-			//printf("simdata in pfprop %i\n", (simData + j)->predator);
-		}
 		*ll = 0.0;
 
 		if ((tempStateVec + 0)->vpptuple == NULL) {
@@ -195,7 +193,8 @@ void pfPropPar(lvstate ppstate[16], obsdata *myobsdata, double *lvParam, double 
 
 		memset(tempStateVec[0].vpptuple, 0, SAMPLENUM * sizeof(lvstate));
 		for (j = 0; j < SAMPLENUM; j++) {
-			((tempStateVec + 0)->vpptuple + j)->predator = (simData + j)->predator;
+			((tempStateVec + 0)->vpptuple + j)->predator0 = (simData + j)->predator0;
+			((tempStateVec + 0)->vpptuple + j)->predator1 = (simData + j)->predator1;
 			((tempStateVec + 0)->vpptuple + j)->prey = (simData + j)->prey;
 		}
 	}
@@ -225,8 +224,8 @@ void pfPropPar(lvstate ppstate[16], obsdata *myobsdata, double *lvParam, double 
 		{
 			for (j = 0; j < SAMPLENUM; j++)
 			{
-				((tempStateVec + i)->vpptuple + j)->predator =
-						(simData + j)->predator;
+				((tempStateVec + i)->vpptuple + j)->predator0 = (simData + j)->predator0;
+				((tempStateVec + i)->vpptuple + j)->predator1 = (simData + j)->predator1;
 				((tempStateVec + i)->vpptuple + j)->prey = (simData + j)->prey;
 				lw[j] = obsLik(((tempStateVec + i)->vpptuple + j), myobsdata[i].rawdata);
 			}
@@ -264,25 +263,31 @@ void pfPropPar(lvstate ppstate[16], obsdata *myobsdata, double *lvParam, double 
 	//			memset(myStateVec[k].vpptuple,0,SAMPLENUM * sizeof(lvstate));
 
 				for (j = 0; j < SAMPLENUM; j++) {
-					((myStateVec + k)->vpptuple + j)->predator =
-							((tempStateVec + k)->vpptuple + rows[j])->predator;
+					((myStateVec + k)->vpptuple + j)->predator0 =
+							((tempStateVec + k)->vpptuple + rows[j])->predator0;
+					((myStateVec + k)->vpptuple + j)->predator1 =
+							((tempStateVec + k)->vpptuple + rows[j])->predator1;
 					((myStateVec + k)->vpptuple + j)->prey =
 							((tempStateVec + k)->vpptuple + rows[j])->prey;
 					//printf("row %i %i,%i,%i,%i,%i\n", i,k,j,rows[j],((myStateVec+k)->vpptuple+j)->prey,((tempStateVec+k)->vpptuple+rows[j])->prey);
 				}
 				for (j = 0; j < SAMPLENUM; j++) {
-					((tempStateVec + k)->vpptuple + j)->predator =
-							((myStateVec + k)->vpptuple + j)->predator;
+					((tempStateVec + k)->vpptuple + j)->predator0 =
+							((myStateVec + k)->vpptuple + j)->predator0;
+					((tempStateVec + k)->vpptuple + j)->predator1 =
+							((myStateVec + k)->vpptuple + j)->predator1;
 					((tempStateVec + k)->vpptuple + j)->prey =
 							((myStateVec + k)->vpptuple + j)->prey;
 				}
 			}
 			for (j = 0; j < SAMPLENUM; j++) {
-				simData[j].predator = ((myStateVec + i)->vpptuple + j)->predator;
+				simData[j].predator0 = ((myStateVec + i)->vpptuple + j)->predator0;
+				simData[j].predator1 = ((myStateVec + i)->vpptuple + j)->predator1;
 				simData[j].prey = ((myStateVec + i)->vpptuple + j)->prey;
 				//printf("simdata in pfprop i%\n", simData[j].predator);
 			}
 			likehood = likehood + maxLw + log(wSum/SAMPLENUM);
+			printf("likehood: %f, maxLW: %f, mean: %f, wSum: %f\n", likehood, maxLw, log(wSum/SAMPLENUM), wSum);
 			*ll = likehood;
 			rows[SAMPLENUM] = 0;
 		}
@@ -292,7 +297,8 @@ void pfPropPar(lvstate ppstate[16], obsdata *myobsdata, double *lvParam, double 
 	{
 		for (i = 0; i < obsnum; i++) {
 			ppstate[i].prey = ((myStateVec + i)->vpptuple + 0)->prey;
-			ppstate[i].predator = ((myStateVec + i)->vpptuple + 0)->predator;
+			ppstate[i].predator0 = ((myStateVec + i)->vpptuple + 0)->predator0;
+			ppstate[i].predator1 = ((myStateVec + i)->vpptuple + 0)->predator1;
 		}
 	}
 
@@ -336,19 +342,24 @@ void stepLV(lvstate *state, double *t0p, double *dtp, double *lvParam, MPI_Datat
 	MPI_Comm_size(MPI_COMM_WORLD, &procnum);
 
 	register double t0 = *t0p, dt = *dtp, t;
-	register double h0, h1, h2, h3, u, l0, l1, l2;
-	register int prey, predator;
+	register double h0, h1, h2, h3, h4, h5, u, l0, l1, l2, l3, l4;
+	register int prey, predator0, predator1;
 	prey = state->prey;
-	predator = state->predator;
+	predator0 = state->predator0;
+	predator1 = state->predator1;
 	l0 = lvParam[0];
 	l1 = lvParam[1];
 	l2 = lvParam[2];
+	l3 = lvParam[3];
+	l4 = lvParam[4];
 
 	while (dt > 0) {
 		h1 = l0 * prey;
-		h2 = l1 * prey * predator;
-		h3 = l2 * predator;
-		h0 = h1 + h2 + h3;
+		h2 = l1 * prey * predator0;
+		h3 = l2 * prey * predator1;
+		h4 = l3 * predator0;
+		h5 = l4 * predator1;
+		h0 = h1 + h2 + h3 + h4 + h5;
 
 		if ((h0 < (1e-10)) || (prey >= 1000000))
 			t = 1e99;
@@ -357,24 +368,26 @@ void stepLV(lvstate *state, double *t0p, double *dtp, double *lvParam, MPI_Datat
 		}
 		if (t > dt) {
 			state->prey = prey;
-			state->predator = predator;
+			state->predator0 = predator0;
+			state->predator1 = predator1;
 			return;
 		} else {
 			u = gsl_rng_uniform(r);
 			if (u < (h1 / h0)) {
 				prey = prey + 1;
-				//t0 = t0 + t;
-				dt = dt - t;
 			} else if (u < ((h1 + h2) / h0)) {
 				prey = prey - 1;
-				predator = predator + 1;
-				//t0 = t0 + t;
-				dt = dt - t;
+				predator0 = predator0 + 1;
+			} else if (u < ((h1 + h2 + h3) / h0)) {
+				prey = prey - 1;
+				predator1 = predator1 + 1;
+			} else if (u < ((h1 + h2 + h3 + h4) / h0)) {
+				predator0 = predator0 - 1;
 			} else {
-				predator = predator - 1;
-				//t0 = t0 + t;
-				dt = dt - t;
+				predator1 = predator1 - 1;
 			}
+			dt = dt - t;
+
 		}
 	}
 
@@ -391,8 +404,8 @@ void runPmmhPath(int its, double *lvParam, double *obslik, lvstate ppstate[16],
 	//printf("rank in runPmmhPath %i \n", rank);
 
 	int i, j;
-	double propParam[3];
-	double curParam[3];
+	double propParam[5];
+	double curParam[5];
 	double ll;
 	double propMll, curMll = -1e99;
 	lvstate curPath[obsnum];
@@ -406,38 +419,40 @@ void runPmmhPath(int its, double *lvParam, double *obslik, lvstate ppstate[16],
 	if (rank==0)
 	{
 
-		fprintf(fp, "th1,th2,th3,");
+		fprintf(fp, "th1,th2,th3,th4,th5,");
 		for (i = 0; i <= 30; i++) {
 			if ((i % 2) == 0) {
 				if (i == 30) {
-					fprintf(fp, "x%i,y%i", i, i);
+					fprintf(fp, "x%i,y0_%i,y1_%i", i, i, i);
 				} else {
-					fprintf(fp, "x%i,y%i,", i, i);
+					fprintf(fp, "x%i,y0_%i,y1_%i,", i, i, i);
 				}
 			}
 		}
 		fprintf(fp, "\n");
 		memcpy(curPath, ppstate, sizeof(lvstate) * obsnum);
-		memcpy(curParam, lvParam, sizeof(double) * 3);
+		memcpy(curParam, lvParam, sizeof(double) * 5);
 	}
 
 	for (i = its; i > 0; i--) {
 		//calculate measurements and decide moving to next state or not
 
-		if (rank==0)
-		{
-			memcpy(propParam, curParam, sizeof(double) * 3);
+		//if (rank==0)
+		//{
+			memcpy(propParam, curParam, sizeof(double) * 5);
 			peturb(propParam, MPI_FLOAT, MPI_COMM_WORLD);
-		}
+		//}
 
 		pfPropPar(propPath, myobsdata, propParam, &ll, MPI_FLOAT, MPI_COMM_WORLD);
 
+
 		if (rank==0)
 		{
+			//printf("likelihood %f, parameter %f, %f, %f, %f, %f:\n", ll, propParam[0], propParam[1], propParam[2], propParam[3], propParam[4]);
 			propMll = ll;
 			if (log(gsl_ran_flat(r, 0.0, 1.0)) < (propMll - curMll)) {
 				curMll = propMll;
-				memcpy(curParam, propParam, sizeof(double) * 3);
+				memcpy(curParam, propParam, sizeof(double) * 5);
 				memcpy(curPath, propPath, sizeof(lvstate) * obsnum);
 			}
 		}
@@ -446,13 +461,13 @@ void runPmmhPath(int its, double *lvParam, double *obslik, lvstate ppstate[16],
 		{
 			printf("run for the %ith iteration.\n", i);
 			//write current parameters and state sequence into output
-			fprintf(fp, "%f,%f,%f,", curParam[0], curParam[1], curParam[2]);
+			fprintf(fp, "%f,%f,%f,%f,%f,", curParam[0], curParam[1], curParam[2], curParam[3], curParam[4]);
 
 			for (j = 0; j < obsnum; j++) {
 				if (j == (obsnum - 1)) {
-					fprintf(fp, "%i,%i", curPath[j].prey, curPath[j].predator);
+					fprintf(fp, "%i,%i,%i", curPath[j].prey, curPath[j].predator0, curPath[j].predator1);
 				} else {
-					fprintf(fp, "%i,%i,", curPath[j].prey, curPath[j].predator);
+					fprintf(fp, "%i,%i,%i,", curPath[j].prey, curPath[j].predator0, curPath[j].predator1);
 				}
 			}
 			fprintf(fp, "\n");
@@ -487,11 +502,13 @@ void peturb(double *lvParam, MPI_Datatype datatype, MPI_Comm comm) {
 	//printf("Starting peturb...\n");
 	if (rank==0)
 	{
-		const double SIGMA = 0.01;
+		const double SIGMA = 0.035;
 		//printf("lvParam_before %f, %f, %f\n", lvParam[0], lvParam[1], lvParam[2]);
 		lvParam[0] = lvParam[0] * exp(gsl_ran_gaussian(r, SIGMA));
 		lvParam[1] = lvParam[1] * exp(gsl_ran_gaussian(r, SIGMA));
 		lvParam[2] = lvParam[2] * exp(gsl_ran_gaussian(r, SIGMA));
+		lvParam[3] = lvParam[3] * exp(gsl_ran_gaussian(r, SIGMA));
+		lvParam[4] = lvParam[4] * exp(gsl_ran_gaussian(r, SIGMA));
 		//printf("lvParam_after  %f, %f, %f\n", lvParam[0], lvParam[1], lvParam[2]);
 	}
 	return;
@@ -506,12 +523,14 @@ void simPrior(lvstate *simData, MPI_Datatype datatype, MPI_Comm comm)
 
 	int i;
 
-	const double PREY_MEAN = 50.0;
-	const double PRED_MEAN = 100.0;
+	const double PREY_MEAN = 800.0;
+	const double PRED0_MEAN = 500.0;
+	const double PRED1_MEAN = 600.0;
 
 	for (i = 0; i < SAMPLENUM; i++) {
 		simData[i].prey = gsl_ran_poisson(r, PREY_MEAN);
-		simData[i].predator = gsl_ran_poisson(r, PRED_MEAN);
+		simData[i].predator0 = gsl_ran_poisson(r, PRED0_MEAN);
+		simData[i].predator1 = gsl_ran_poisson(r, PRED1_MEAN);
 		//printf("simPrior %i\n", simData[i].predator);
 	}
 	//printf("End simPrior...\n");
@@ -528,7 +547,7 @@ void runModel(int its, MPI_Datatype datatype, MPI_Comm comm) {
 	obsdata myobsdata[obsnum];
 	lvstate mylvstate[obsnum];
 	double ll = 0.0;
-	double lvParam[3] = { 1.0, 0.005, 0.6 };
+	double lvParam[5] = { 10.0, 0.005, 0.0025, 6.0, 3.0 };
 
 	//produce time list(with even number in)
 	if (rank==0) {
@@ -543,7 +562,7 @@ void runModel(int its, MPI_Datatype datatype, MPI_Comm comm) {
 		}
 
 		//read external txt file
-		FILE *file = fopen("LVpreyNoise10.txt", "r");
+		FILE *file = fopen("LV12.txt", "r");
 		char line[1024];
 		if (file == NULL) {
 			printf("file is null.\n");
@@ -588,7 +607,7 @@ int main(int argc,char *argv[])
 	//printf("rank in main %i \n", rank);
 
 	if (argc == 1) {
-		its = 10;
+		its = 50;
 	}
 	else {
 		its = atoi(argv[1]);
@@ -615,4 +634,3 @@ int main(int argc,char *argv[])
 	MPI_Finalize();
     return(EXIT_SUCCESS);
 }
-*/

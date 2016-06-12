@@ -29,7 +29,7 @@ all: MPI
 MPI: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C Linker'
-	gcc  -o "MPI" $(OBJS) $(USER_OBJS) $(LIBS)
+	gcc -L/home/htihe9/code/mpi/sprng2.0/lib -o "MPI" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
