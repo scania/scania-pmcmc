@@ -1,4 +1,3 @@
-/*
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +8,7 @@
 #include <mpi.h>
 #include <time.h>
 #include <unistd.h>
+#include <signal.h>
 
 const int SAMPLENUM = 1000;
 int obsnum;
@@ -23,7 +23,9 @@ typedef struct {
 
 typedef struct {
 	double time;
-	double rawdata;
+	int prey;
+	int predator0;
+	int predator1;
 } obsdata;
 
 void simPrior(lvstate *simData, MPI_Datatype datatype, MPI_Comm comm);
@@ -31,10 +33,17 @@ void rowsample(int *rows, double *w);
 void stepLV(lvstate *state, double *t0p, double *dtp, double *lvParam, MPI_Datatype datatype, MPI_Comm comm);
 void peturb(double *lvParam, MPI_Datatype datatype, MPI_Comm comm);
 
-double obsLik(lvstate *mystate, double obs)
+
+double obsLik(lvstate *mystate, obsdata obs)
 {
-		const double SIGMA = 20.0;
-		return log(gsl_ran_gaussian_pdf((obs - mystate->prey), SIGMA));
+	double obsll = 0.0;
+	const double SIGMA = 100.0;
+	int speciesSize = 0;
+	int i = 0;
+	obsll = log(gsl_ran_gaussian_pdf((obs.prey - mystate->prey), SIGMA));
+	obsll = obsll + log(gsl_ran_gaussian_pdf((obs.predator0 - mystate->predator0), SIGMA));
+	obsll = obsll + log(gsl_ran_gaussian_pdf((obs.predator1 - mystate->predator1), SIGMA));
+	return obsll;
 }
 
 void mpiStepLV(lvstate *simData, double *t0p, double *dtp, double *lvParam, MPI_Datatype datatype, MPI_Comm comm)
@@ -129,7 +138,7 @@ void mpiStepLV(lvstate *simData, double *t0p, double *dtp, double *lvParam, MPI_
 }
 
 //particle filter: output new estimated lvstate and its likehood
-void pfPropPar(lvstate ppstate[16], obsdata *myobsdata, double *lvParam, double *ll, MPI_Datatype datatype, MPI_Comm comm)
+void pfPropPar(lvstate ppstate[6], obsdata *myobsdata, double *lvParam, double *ll, MPI_Datatype datatype, MPI_Comm comm)
 {
 	int rank, procnum;
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
@@ -141,7 +150,7 @@ void pfPropPar(lvstate ppstate[16], obsdata *myobsdata, double *lvParam, double 
 
 	int i, j, k, l;
 
-	double timeUnit = 2.0;
+	double timeUnit = 4.0;
 	int deltaTimeUnit = 1;
 	double delTime = timeUnit * deltaTimeUnit;
 	double curTime = 0.0;
@@ -162,19 +171,19 @@ void pfPropPar(lvstate ppstate[16], obsdata *myobsdata, double *lvParam, double 
 		memset(simData, 0, SAMPLENUM * sizeof(lvstate));
 	}
 	//initiate state: get simulated prey-predator tuple
-		stateVec *myStateVec = malloc(obsnum * sizeof(stateVec));
-		if (myStateVec == NULL) {
-			printf("Fail to initiate myStateVec...Exit");
-			goto freeMem;
-		}
-		memset(myStateVec, 0, obsnum * sizeof(stateVec));
+	stateVec *myStateVec = malloc(obsnum * sizeof(stateVec));
+	if (myStateVec == NULL) {
+		printf("Fail to initiate myStateVec...Exit");
+		goto freeMem;
+	}
+	memset(myStateVec, 0, obsnum * sizeof(stateVec));
 
-		stateVec *tempStateVec = malloc(obsnum * sizeof(stateVec));
-		if (tempStateVec == NULL) {
-			printf("Fail to initiate tempStateVec...Exit");
-			goto freeMem;
-		}
-		memset(tempStateVec, 0, obsnum * sizeof(stateVec));
+	stateVec *tempStateVec = malloc(obsnum * sizeof(stateVec));
+	if (tempStateVec == NULL) {
+		printf("Fail to initiate tempStateVec...Exit");
+		goto freeMem;
+	}
+	memset(tempStateVec, 0, obsnum * sizeof(stateVec));
 
 	if (rank==0)
 	{
@@ -226,7 +235,7 @@ void pfPropPar(lvstate ppstate[16], obsdata *myobsdata, double *lvParam, double 
 				((tempStateVec + i)->vpptuple + j)->predator0 = (simData + j)->predator0;
 				((tempStateVec + i)->vpptuple + j)->predator1 = (simData + j)->predator1;
 				((tempStateVec + i)->vpptuple + j)->prey = (simData + j)->prey;
-				lw[j] = obsLik(((tempStateVec + i)->vpptuple + j), myobsdata[i].rawdata);
+				lw[j] = obsLik(((tempStateVec + i)->vpptuple + j), myobsdata[i]);
 			}
 
 			//get the max line weight
@@ -372,7 +381,6 @@ void stepLV(lvstate *state, double *t0p, double *dtp, double *lvParam, MPI_Datat
 				predator1 = predator1 - 1;
 			}
 			dt = dt - t;
-
 		}
 	}
 	return;
@@ -425,7 +433,7 @@ void runPmmhPath(int its, double *lvParam, double *obslik, lvstate ppstate[16],
 
 		if (rank==0)
 		{
-			//printf("likelihood %f, parameter %f, %f, %f, %f, %f:\n", ll, propParam[0], propParam[1], propParam[2], propParam[3], propParam[4]);
+			printf("likelihood %f, parameter %f, %f, %f, %f, %f:\n", ll, propParam[0], propParam[1], propParam[2], propParam[3], propParam[4]);
 			propMll = ll;
 			if (log(gsl_ran_flat(r, 0.0, 1.0)) < (propMll - curMll)) {
 				curMll = propMll;
@@ -436,9 +444,9 @@ void runPmmhPath(int its, double *lvParam, double *obslik, lvstate ppstate[16],
 
 		if (rank==0)
 		{
-			printf("run for the %ith iteration.\n", i);
+			//printf("run for the %ith iteration.\n", i);
 			//write current parameters and state sequence into output
-			fprintf(fp, "%f,%f,%f,%f,%f,", curParam[0], curParam[1], curParam[2], curParam[3], curParam[4]);
+			fprintf(fp, "%f,%f,%f,%f,%f,%f,", ll, curParam[0], curParam[1], curParam[2], curParam[3], curParam[4]);
 
 			for (j = 0; j < obsnum; j++) {
 				if (j == (obsnum - 1)) {
@@ -448,7 +456,7 @@ void runPmmhPath(int its, double *lvParam, double *obslik, lvstate ppstate[16],
 				}
 			}
 			fprintf(fp, "\n");
-			printf("end for the %ith iteration.\n", i);
+			//printf("end for the %ith iteration.\n", i);
 		}
 
 	}
@@ -478,7 +486,7 @@ void peturb(double *lvParam, MPI_Datatype datatype, MPI_Comm comm) {
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 	if (rank==0)
 	{
-		const double SIGMA = 0.035;
+		const double SIGMA = 0.014;
 		lvParam[0] = lvParam[0] * exp(gsl_ran_gaussian(r, SIGMA));
 		lvParam[1] = lvParam[1] * exp(gsl_ran_gaussian(r, SIGMA));
 		lvParam[2] = lvParam[2] * exp(gsl_ran_gaussian(r, SIGMA));
@@ -512,8 +520,17 @@ void runModel(int its, MPI_Datatype datatype, MPI_Comm comm) {
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 
-	obsnum = 16;
-	obsdata myobsdata[obsnum];
+	obsnum = 6;
+	obsdata *myobsdata = malloc(obsnum * sizeof(obsdata));
+	if (myobsdata == NULL) {
+		printf("Fail to initiate myobsdata...EXIT!");
+		return;
+	}
+	else {
+		memset(myobsdata, 0, obsnum * sizeof(lvstate));
+	}
+
+	char *st = NULL;
 	lvstate mylvstate[obsnum];
 	double ll = 0.0;
 	double lvParam[5] = { 10.0, 0.005, 0.0025, 6.0, 3.0 };
@@ -522,16 +539,17 @@ void runModel(int its, MPI_Datatype datatype, MPI_Comm comm) {
 	if (rank==0) {
 		int i;
 		int j = 0;
+		int k = 0;
 
-		for (i = 0; i <= 30; i++) {
-			if ((i % 2) == 0) {
+		for (i = 0; i <= 20; i++) {
+			if ((i % 4) == 0) {
 				myobsdata[j].time = (double) i;
 				j++;
 			}
 		}
 
 		//read external txt file
-		FILE *file = fopen("LV12.txt", "r");
+		FILE *file = fopen("LV12data-4.txt", "r");
 		char line[1024];
 		if (file == NULL) {
 			printf("file is null.\n");
@@ -540,11 +558,31 @@ void runModel(int its, MPI_Datatype datatype, MPI_Comm comm) {
 		if (file != NULL) {
 			i = 0;
 			while (fgets(line, 1024, file)) {
-				myobsdata[i].rawdata = atof(line);
+				//myobsdata[i].rawdata = atof(line);
+				//sscanf(line, "%s\t%\t%[^\n]", &myobsdata[i].prey, &myobsdata[i].predator0, &myobsdata[i].predator1);
+
+				char *next = line;
+				k = 0;
+				while(*next && *next != '\n')
+				{
+					if(k==0)
+						myobsdata[i].prey = strtol(next, &next, 0);
+					else if(k==1)
+						myobsdata[i].predator0 = strtol(next, &next, 0);
+					else if(k==2)
+						myobsdata[i].predator1 = strtol(next, &next, 0);
+					k++;
+				}
 				i++;
 			}
 			fclose(file);
 		}
+
+		//for (i=0;i<6;i++)
+		//{
+			//printf("%f, %i, %i, %i\n", myobsdata[i].time, myobsdata[i].prey, myobsdata[i].predator0, myobsdata[i].predator1);
+		//}
+
 	}
 
 	runPmmhPath(its, lvParam, &ll, mylvstate, myobsdata, MPI_FLOAT, MPI_COMM_WORLD);
@@ -572,7 +610,7 @@ int main(int argc,char *argv[])
 	MPI_Comm_size(MPI_COMM_WORLD, &procnum);
 
 	if (argc == 1) {
-		its = 50;
+		its = 100;
 	}
 	else {
 		its = atoi(argv[1]);
@@ -599,4 +637,9 @@ int main(int argc,char *argv[])
 	MPI_Finalize();
     return(EXIT_SUCCESS);
 }
-*/
+
+//Latest 3_observed_data version
+//1. read input file with 3 coloums
+//2. function obslik: --SIGMA = 100; --Sum up all prey and predators likelihood
+//3. time step = 4, from 0 to 20
+//4. in function peturb, SIGMA = 0.014 to propose a new sets of parameter
