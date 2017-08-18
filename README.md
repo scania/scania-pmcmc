@@ -8,3 +8,5 @@ If you have any question for now, you can reach us at
 Huijie Shen: huijieshen.fdu@gmail.com, or
 
 Tingwei Huang: grace.htw@gmail.com.
+
+Erik Lönroth: erik.lonroth@gmail.com
